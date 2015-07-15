@@ -25,6 +25,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 		};
 		settings = $.extend(defaults, options);			
 	}
+	var browser = (function(){
+		var ua = window.navigator.userAgent.toLowerCase();
+		return {
+			msie:ua.indexOf("msie") >= 0 ||!!ua.match(/trident.*rv\:11\./) || ua.indexOf('edge/') >=0,
+			firefox:ua.indexOf("firefox") >=0,
+			chrome:ua.indexOf("chrome") >=0
+		};
+	})();
 	var _mouse_wheel = function(fn){
 		var _this = this.context;
 		if(typeof fn == 'function'){
@@ -45,6 +53,28 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 			}
 		}
 	}
+	
+	/*
+	*	如果num 大于 max,则返回max,如果小于min,则返回min,否则返回num
+	*/
+	var range = function(num, max, min){
+		return Math.min(max, Math.max(num, min));
+	}
+	
+	var _scroll_ = function(_this, deltaY, offsetRate, scrollRate){
+		var slider = _this.find(".sliderthumb");
+		var top = slider.position().top;
+		var offsetY = top - deltaY * scrollRate;
+
+		var minY = 10;
+		var maxY = settings.height - minY - slider.height();		
+		slider.css("top", range(offsetY, maxY, minY) +"px");
+		var contentContarin = _this.children("ul");
+		var contentTop = contentContarin.position().top;
+		var contentOffsetY = contentTop + deltaY * offsetRate * scrollRate;
+		var contentMaxOffsetY = contentContarin.height() - settings.height;
+		contentContarin.css("top", range(contentOffsetY, 0, -contentMaxOffsetY)+"px");
+	};
 	$.fn.easySlider = function(options){
 
 		init(options);
@@ -66,30 +96,40 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 			
 			_create_container(_this, sliderHeight);
 			
-			/*
-			*	如果num 大于 max,则返回max,如果小于min,则返回min,否则返回num
-			*/
-			var range = function(num, max, min){
-				return Math.min(max, Math.max(num, min));
-			}
+			
 			_mouse_wheel.call(_this, function(deltaY){
-				var slider = $(".sliderthumb");
-				var top = slider.position().top;
-				var offsetY = top - deltaY * settings.scrollRate;
-
-				var minY = 10;
-				var maxY = settings.height - minY - slider.height();		
-				slider.css("top", range(offsetY, maxY, minY) +"px");
-				var contentContarin = _this.children("ul");
-				var contentTop = contentContarin.position().top;
-				var contentOffsetY = contentTop + deltaY * offsetRate * settings.scrollRate;
-				var contentMaxOffsetY = contentContarin.height() - settings.height;
-				contentContarin.css("top", range(contentOffsetY, 0, -contentMaxOffsetY)+"px");
+				_scroll_(_this, deltaY, offsetRate, settings.scrollRate);
 			});
-			$(".sliderthumb").live("mousedown",function(event){
-				//debugger;
-				var key = event.keyCode|| event.which;
-				console.log(key);
+			_this.find(".sliderrail").live("mousedown",function(event){
+				var sliderBar = _this.find(".sliderthumb");
+				var sliderBarTop = sliderBar.height()/2 + sliderBar.offset().top;
+				var offset = sliderBarTop - event.clientY;
+				_scroll_(_this, offset, offsetRate, 1);
+			});
+			_this.find(".sliderthumb").live("mousedown mouseup",function(e){
+				if(e.type == 'mousedown'){
+					var offset = 0;
+					var lastClientY = e.clientY;
+					$(document).bind("mousemove mouseup", function(event){
+						if(event.type == 'mousemove'){
+							if(browser.msie){//ie
+								offset = (lastClientY - event.clientY);
+								lastClientY = event.clientY;
+							}else if(browser.firefox){//firefox
+								offset = -event.originalEvent.mozMovementY;
+							}else if(browser.chrome){//chrome
+								offset = -event.originalEvent.movementY;
+							}
+							_scroll_(_this, offset, offsetRate, 1);
+						}else{
+							$(document).unbind("mousemove");
+						}
+						
+					});
+					
+				}else{
+					$(document).unbind("mousemove");
+				}
 			});
 		});
 	}
